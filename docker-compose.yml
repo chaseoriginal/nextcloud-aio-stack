@@ -1,0 +1,177 @@
+# GitHub source of truth: chaseoriginal/nextcloud-aio
+services:
+  nextcloud-aio-database:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    image: ghcr.io/nextcloud-releases/aio-postgresql@sha256:b6c9b6c293641f426d8b8ef1a87753906916aca11d28e62d9ecec0e4aa7539fd
+    container_name: nc-database
+    restart: unless-stopped
+    depends_on: []
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      AIO_LOG_LEVEL: info
+    volumes:
+      - nextcloud_aio_database:/var/lib/postgresql/data
+      - nextcloud_aio_database_dump:/mnt/data
+    networks:
+      - nextcloud-aio
+
+  nextcloud-aio-redis:
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_HOST_PASSWORD ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    image: redis:7-alpine
+    container_name: nc-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_HOST_PASSWORD}
+    environment:
+      AIO_LOG_LEVEL: info
+    volumes:
+      - nextcloud_aio_redis:/data
+    networks:
+      - nextcloud-aio
+
+  nextcloud-aio-nextcloud:
+    healthcheck:
+      test: ["CMD-SHELL", "su -s /bin/bash www-data -c php /var/www/html/occ status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    image: ghcr.io/nextcloud-releases/aio-nextcloud@sha256:b6ac75393aa5e1a484b3b6cbb742227fcec4c3bdf62d0ce66d53af9065bb3d33
+    container_name: nc-nextcloud
+    restart: unless-stopped
+    depends_on:
+      nextcloud-aio-database:
+        condition: service_started
+      nextcloud-aio-redis:
+        condition: service_started
+    environment:
+      REDIS_HOST: nextcloud-aio-redis
+      REDIS_HOST_PASSWORD: ${REDIS_HOST_PASSWORD}
+      REDIS_PORT: "6379"
+      REDIS_DB_INDEX: "0"
+      POSTGRES_HOST: nextcloud-aio-database
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      NEXTCLOUD_DATA_DIR: /var/www/html/data
+      AIO_LOG_LEVEL: info
+      APACHE_MAX_TIME: "3600"
+      APACHE_BODY_SIZE: 10G
+      PHP_MEMORY_LIMIT: 1024M
+      PHP_UPLOAD_LIMIT: 16G
+      PHP_MAX_TIME: "3600"
+      NEXTCLOUD_VERSION: "34.0.4"
+      AIO_TOKEN: "123456"
+      AIO_URL: localhost
+      OVERWRITEHOST: nextcloud.echoinggreen.net
+      OVERWRITEPROTOCOL: https
+      NC_DOMAIN: nextcloud.echoinggreen.net
+    volumes:
+      - nextcloud_aio_nextcloud:/var/www/html
+      - /media/Multimedia:/Multimedia
+      - /media/Photos:/Photos
+      - /media/Multimedia/Movies:/Movies
+      - /media/Multimedia/Music:/Music
+      - /media/Multimedia/TV Series:/TV
+      - /home/ladmin/nextcloud-aio/host/datadir-override.config.php:/var/www/html/config/datadir-override.config.php:ro
+      - /home/ladmin/nextcloud-aio/host/nc-custom-entrypoint.sh:/var/www/html/nc-custom-entrypoint.sh:ro
+    networks:
+      - nextcloud-aio
+
+  nextcloud-aio-apache:
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:11000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    image: nc-apache-custom
+    container_name: nc-apache
+    restart: unless-stopped
+    depends_on:
+      nextcloud-aio-nextcloud:
+        condition: service_started
+    environment:
+      NC_DOMAIN: nextcloud.echoinggreen.net
+      NEXTCLOUD_HOST: nextcloud-aio-nextcloud
+      NOTIFY_PUSH_HOST: 172.20.0.1
+      APACHE_MAX_SIZE: "17179869184"
+      APACHE_MAX_TIME: "3600"
+      APACHE_PORT: "11000"
+      TALK_PORT: "11001"
+      AIO_LOG_LEVEL: warn
+    ports:
+      - "8080:11000"
+    volumes:
+      - nextcloud_aio_nextcloud:/var/www/html
+      - /media/Multimedia:/Multimedia
+      - /media/Photos:/Photos
+      - /media/Multimedia/Movies:/Movies
+      - /media/Multimedia/Music:/Music
+      - /media/Multimedia/TV Series:/TV
+      - /media/Multimedia/Movies:/Movies
+      - /media/Multimedia/Music:/Music
+      - /media/Multimedia/TV Series:/TV
+      - /home/ladmin/nextcloud-aio/host/datadir-override.config.php:/var/www/html/config/datadir-override.config.php:ro
+      - /home/ladmin/nextcloud-aio/host/nc-custom-entrypoint.sh:/var/www/html/nc-custom-entrypoint.sh:ro
+      - /media/Multimedia:/Multimedia
+      - /media/Photos:/Photos
+    networks:
+      - nextcloud-aio
+
+  nextcloud-aio-notify-push:
+    image: ghcr.io/nextcloud-releases/aio-notify-push:latest
+    container_name: nc-notify-push
+    restart: unless-stopped
+    depends_on:
+      nextcloud-aio-nextcloud:
+        condition: service_started
+    environment:
+      VERIFY_SSL: "false"
+      PORT: "7867"
+      AIO_LOG_LEVEL: info
+      NEXTCLOUD_HOST: nextcloud-aio-nextcloud
+      INTERNAL_NC_URL: http://nextcloud-aio-nextcloud:80
+      NC_URL: https://nextcloud.echoinggreen.net
+      NC_PORT: "443"
+    volumes:
+      - nextcloud_aio_nextcloud:/var/www/html
+      - /media/Multimedia:/Multimedia
+      - /media/Photos:/Photos
+      - /media/Multimedia/Movies:/Movies
+      - /media/Multimedia/Music:/Music
+      - /media/Multimedia/TV Series:/TV
+      - /home/ladmin/nextcloud-aio/host/datadir-override.config.php:/var/www/html/config/datadir-override.config.php:ro
+      - /home/ladmin/nextcloud-aio/host/nc-custom-entrypoint.sh:/var/www/html/nc-custom-entrypoint.sh:ro
+    networks:
+      - nextcloud-aio
+
+volumes:
+  nextcloud_aio_database:
+    external: true
+    name: nextcloud_aio_database
+  nextcloud_aio_database_dump:
+    external: true
+    name: nextcloud_aio_database_dump
+  nextcloud_aio_redis:
+    external: true
+    name: nextcloud_aio_redis
+  nextcloud_aio_nextcloud:
+    external: true
+    name: nextcloud_aio_nextcloud
+
+networks:
+  nextcloud-aio:
+    external: true
+    name: nextcloud-aio
