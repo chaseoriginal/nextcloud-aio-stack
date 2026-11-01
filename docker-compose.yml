@@ -91,7 +91,7 @@ services:
 
   nextcloud-aio-apache:
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:11000/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:11000/status.php || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
