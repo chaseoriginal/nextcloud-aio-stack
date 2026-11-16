@@ -131,7 +131,7 @@ services:
       - nextcloud-aio
 
   nextcloud-aio-notify-push:
-    image: ghcr.io/nextcloud-releases/aio-notify-push:latest@sha256:9e3e677d215f510dd6083e9c5d28b4b26cc1451342ee7ac7647ac8ea3afa3d20@sha256:9e3e677d215f510dd6083e9c5d28b4b26cc1451342ee7ac7647ac8ea3afa3d20@sha256:9e3e677d215f510dd6083e9c5d28b4b26cc1451342ee7ac7647ac8ea3afa3d20
+    image: ghcr.io/nextcloud-releases/aio-notify-push:latest@sha256:9e3e677d215f510dd6083e9c5d28b4b26cc1451342ee7ac7647ac8ea3afa3d20
     container_name: nc-notify-push
     restart: unless-stopped
     depends_on:
