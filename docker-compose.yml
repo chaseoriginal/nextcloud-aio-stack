@@ -29,7 +29,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    image: redis:7-alpine
+    image: 7.4.12-alpine
     container_name: nc-redis
     restart: unless-stopped
     command: redis-server --requirepass ${REDIS_HOST_PASSWORD}
